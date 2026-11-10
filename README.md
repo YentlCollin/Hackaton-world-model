@@ -1,74 +1,61 @@
-# Hackaton world model
+# Hackaton world model — LeWM experiments
 
-**Yentl Collin · Hack the World · JEPA world modeling and planning**
+**Yentl Collin and collaborators · Hack the World**
 
-Hackathon work on an action-conditioned world model that predicts multiple
-future latent states in one forward pass, then uses self-speculative rollouts
-inside model-predictive control (MPC). Future trajectories are drafted in
-parallel, checked by the same predictor in one-step mode, and corrected from
-the first rejected step.
+This branch preserves the LeWorldModel (LeWM) action-conditioned JEPA
+experiment: multi-token future prediction, self-speculative latent rollout,
+training, representation validation and a timed speed benchmark.
 
-This branch contains the **MPC version described in my CV**.
-The [LeWM experiment and timing benchmark](https://github.com/YentlCollin/Hackaton-world-model/tree/lewm)
-are kept on a separate branch because they use a different model/data stack.
-
-## What I implemented
-
-- A causal multi-horizon action-conditioned predictor, with masks that expose
-  only the action prefix needed for each future state.
-- Direct prediction of several future latent states in a single forward pass.
-- Latent trajectory drafting, one-step verification, prefix acceptance and
-  regeneration after a mismatch.
-- Integration into the MPPI planning loop and a dedicated speculative config.
+For the version integrated into the MPC planner, use
+[the main branch](https://github.com/YentlCollin/Hackaton-world-model/tree/main).
 
 ## Read the code
 
-| File | Role |
-|---|---|
-| [architectures.py](eb_jepa/architectures.py) | `CausalMultiHorizonPredictor` and its causal attention mask. |
-| [jepa.py](eb_jepa/jepa.py) | Direct multi-horizon inference and `_self_speculative_unroll`. |
-| [planning.py](eb_jepa/planning.py) | MPC/MPPI integration and rollout-mode selection. |
-| [main.py](examples/ac_video_jepa/main.py) | Training entry point. |
-| [Speculative MPPI config](examples/ac_video_jepa/cfgs/planning_speculative_mppi.yaml) | Planning horizon, verification metric and acceptance threshold. |
-| [Tests](tests/test_jepa_output_formats.py) | Multi-horizon masks, prediction shapes, losses and speculative rollout. |
+- [eb_jepa/lewm.py](eb_jepa/lewm.py): encoder, action-conditioned MTP heads,
+  drafting, latent verification, prefix acceptance and correction.
+- [Training](examples/lewm/main_lewm.py) and [configurations](examples/lewm/cfgs/).
+- [Validation](examples/lewm/val_lewm.py): position probes and rollout error.
+- [Timed benchmark](examples/lewm/bench_speculative.py): AR versus speculative
+  latent rollout on the same checkpoint and inputs.
+- [Tests](tests/test_lewm_speculative.py): prefix acceptance and rollout behavior.
 
-[Technical explanation — PDF](rapport/main.pdf) · [LaTeX source](rapport/main.tex)
+## Install and run
 
-## Run
-
-The original project targets **Python 3.12**. From the repository root:
+The original project targets Python 3.12:
 
 ```bash
 uv sync
-uv run pytest tests/test_jepa_output_formats.py -k 'direct_multi_horizon or self_speculative'
+uv run pytest tests/test_lewm_speculative.py
+
+uv run python -m examples.lewm.main_lewm \
+  --fname examples/lewm/cfgs/lewm_two_rooms.yaml \
+  --folder runs/lewm
 ```
 
-Start from [the training config](examples/ac_video_jepa/cfgs/train.yaml).
-For speculative planning, select
-`examples/ac_video_jepa/cfgs/planning_speculative_mppi.yaml` through the
-training/evaluation configuration's `eval.plan_cfg_path` field. A trained
-checkpoint is needed for meaningful planning; no model weights are bundled.
+After training an MTP checkpoint:
 
-## Speed measurement
+```bash
+uv run python -m examples.lewm.bench_speculative \
+  --ckpt runs/lewm/latest.pth.tar \
+  --out runs/lewm/speculative_speedup.pdf --repeats 30 --threshold 0.1
+```
 
-The implementation provides the draft/verify mechanism. Saved measurements
-establishing a particular wall-clock speedup are not included in this copy.
-The [LeWM branch](https://github.com/YentlCollin/Hackaton-world-model/tree/lewm)
-contains a timed latent-rollout benchmark. It measures autoregressive versus
-self-speculative prediction, not complete MPC episode time. The gain depends
-on horizon, acceptance threshold, batch size, hardware and model quality.
+## Interpreting the benchmark
 
-## Origin and attribution
+The timing script warms up the predictor, synchronizes CUDA and averages
+repeated measurements at several rollout horizons. Speedup is measured as
+`AR time / speculative time`. No fixed speedup is asserted by this repository;
+saved benchmark results and checkpoints are not included.
 
-This project builds on **EB-JEPA**, the Meta FAIR community implementation,
-and the collaborative [Gklajer/eb_jepa](https://github.com/Gklajer/eb_jepa)
-repository. The upstream license and author metadata are retained; the base
-library is not claimed as my own work.
+The benchmark times latent rollouts, not a complete MPC episode. It does not
+measure planning success or rollout quality; use the validation scripts as well.
+The optional acceleration animation uses an idealized full-acceptance schedule,
+which is an illustration rather than measured wall-clock evidence.
 
-The copied MPC snapshot is commit
-[`3c674747`](https://github.com/Gklajer/eb_jepa/commit/3c674747d9687809ac5f4163ab4b7c94a0fe3ad2).
-My relevant contributions are recorded in
-[the multi-horizon predictor commit](https://github.com/Gklajer/eb_jepa/commit/7ab3c44bfa5174e0dc5d3922394f35c9be822edc)
-and [the self-speculative MPC commit](https://github.com/Gklajer/eb_jepa/commit/3c674747d9687809ac5f4163ab4b7c94a0fe3ad2).
+## Origin
 
-Code license: [Apache 2.0](LICENSE.md).
+Copied from [Gklajer/eb_jepa](https://github.com/Gklajer/eb_jepa), snapshot
+[`90aad8db`](https://github.com/Gklajer/eb_jepa/commit/90aad8db324b0dd5ab233bcc2f49879a3b11e5ef),
+built on EB-JEPA by Meta FAIR. Upstream authorship and [Apache 2.0](LICENSE.md)
+are retained. Only this experiment, its package dependencies and tests are
+selected; cluster-specific launchers are omitted.
