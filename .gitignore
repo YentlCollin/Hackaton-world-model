@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv*/
+*.egg-info/
+.env
+.env.*
+/checkpoints/
+/runs/
+/datasets/
+wandb/
+.DS_Store
+*.pth
+*.pt
+*.pth.tar
