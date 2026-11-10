@@ -8,10 +8,6 @@ inside model-predictive control (MPC). Future trajectories are drafted in
 parallel, checked by the same predictor in one-step mode, and corrected from
 the first rejected step.
 
-This branch contains the **MPC version described in my CV**.
-The [LeWM experiment and timing benchmark](https://github.com/YentlCollin/Hackaton-world-model/tree/lewm)
-are kept on a separate branch because they use a different model/data stack.
-
 ## What I implemented
 
 - A causal multi-horizon action-conditioned predictor, with masks that expose
